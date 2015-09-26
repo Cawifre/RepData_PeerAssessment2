@@ -1,0 +1,14 @@
+---
+title: "NOAA Storm Data Analysis"
+author: "Carey Free"
+output: html_document
+---
+
+##Synopsis
+This is the synopsis. It consists of no more than ten complete sentences.
+
+##Data Processing
+This is where I load the data and do any transformations.
+
+##Results
+This is where I present the results of my analysis.
