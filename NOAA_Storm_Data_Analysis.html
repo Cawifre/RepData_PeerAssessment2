@@ -72,7 +72,49 @@ img {
 </div>
 <div id="data-processing" class="section level2">
 <h2>Data Processing</h2>
-<p>This is where I load the data and do any transformations.</p>
+<p>The storm data was acquired in a compress csv file that can be read directly.</p>
+<pre class="r"><code>rawData &lt;- read.csv(file = &quot;repdata-data-StormData.csv.bz2&quot;,
+                    stringsAsFactors = FALSE)</code></pre>
+<p>Many variables tracked in the data set are not relevent for the high level analysis we are performing and can be discarded. Only the occurance data, event type, and damage information needs to be retained.</p>
+<pre class="r"><code>prunedData &lt;- rawData[,c(&quot;BGN_DATE&quot;,
+                         &quot;EVTYPE&quot;,
+                         &quot;FATALITIES&quot;, &quot;INJURIES&quot;,
+                         &quot;PROPDMG&quot;, &quot;PROPDMGEXP&quot;,
+                         &quot;CROPDMG&quot;, &quot;CROPDMGEXP&quot;)]</code></pre>
+<p>The specification for the data set allow for three different magnitudes for damage estimates: K (thousands of dollars), M (millions), and B (billions). Allowing for lower case usage and absent values (indicating nonexponentiated damage estimates), a number a records remain with invalid damage estimate exponents that must be removed.</p>
+<pre class="r"><code>validExponents &lt;- c(&quot;&quot;, &quot;K&quot;, &quot;k&quot;, &quot;M&quot;, &quot;m&quot;, &quot;B&quot;, &quot;b&quot;)
+prunedData &lt;- prunedData[(prunedData$PROPDMGEXP %in% validExponents)
+                         &amp; (prunedData$CROPDMGEXP %in% validExponents),]</code></pre>
+<p>Having restricted the exponents to valid values, we can apply them to the damage estimates.</p>
+<pre class="r"><code>applyExponent &lt;- function (value, exp) {
+    if (is.na(value) | is.na(exp) | exp == &quot;&quot;)
+    {
+        value
+    }
+    else
+    {
+        multiplier &lt;- switch(exp,
+                             K = 1000, k = 1000,
+                             M = 1000000, m = 1000000,
+                             B = 1000000000, b = 1000000000)
+        value * multiplier
+    }
+}
+prunedData$PropertyDamage &lt;- mapply(applyExponent,
+                                    prunedData$PROPDMG,
+                                    prunedData$PROPDMGEXP)
+prunedData$CropDamage &lt;- mapply(applyExponent,
+                                prunedData$CROPDMG,
+                                prunedData$CROPDMGEXP)</code></pre>
+<p>Two variables read in as strings need to be converted to more useful data types. BGN_DATE will be converted to a POSIXct date-time and EVTYPE will be converted to a factor.</p>
+<pre class="r"><code>library(lubridate)
+prunedData$Date &lt;- mdy_hms(prunedData$BGN_DATE)
+prunedData$EventType &lt;- factor(prunedData$EVTYPE)</code></pre>
+<p>With calculation and type conversions complete, the original columns involved can be discarded. Additionally, the population damage variable can be given friendlier names.</p>
+<pre class="r"><code>prunedData &lt;- prunedData[,c(&quot;Date&quot;, &quot;EventType&quot;,
+                            &quot;INJURIES&quot;, &quot;FATALITIES&quot;,
+                            &quot;PropertyDamage&quot;, &quot;CropDamage&quot;)]
+colnames(prunedData)[c(3,4)] &lt;- c(&quot;Injuries&quot;, &quot;Fatalities&quot;)</code></pre>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>

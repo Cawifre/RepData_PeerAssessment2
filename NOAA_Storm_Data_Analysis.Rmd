@@ -8,7 +8,66 @@ output: html_document
 This is the synopsis. It consists of no more than ten complete sentences.
 
 ##Data Processing
-This is where I load the data and do any transformations.
+The storm data was acquired in a compress csv file that can be read directly.
+```{r, cache=TRUE}
+rawData <- read.csv(file = "repdata-data-StormData.csv.bz2",
+                    stringsAsFactors = FALSE)
+```
+
+Many variables tracked in the data set are not relevent for the high level analysis we are performing and can be discarded. Only the occurance data, event type, and damage information needs to be retained.
+```{r}
+prunedData <- rawData[,c("BGN_DATE",
+                         "EVTYPE",
+                         "FATALITIES", "INJURIES",
+                         "PROPDMG", "PROPDMGEXP",
+                         "CROPDMG", "CROPDMGEXP")]
+```
+
+The specification for the data set allow for three different magnitudes for damage estimates: K (thousands of dollars), M (millions), and B (billions). Allowing for lower case usage and absent values (indicating nonexponentiated damage estimates), a number a records remain with invalid damage estimate exponents that must be removed.
+```{r}
+validExponents <- c("", "K", "k", "M", "m", "B", "b")
+prunedData <- prunedData[(prunedData$PROPDMGEXP %in% validExponents)
+                         & (prunedData$CROPDMGEXP %in% validExponents),]
+```
+
+Having restricted the exponents to valid values, we can apply them to the damage estimates.
+```{r}
+applyExponent <- function (value, exp) {
+    if (is.na(value) | is.na(exp) | exp == "")
+    {
+        value
+    }
+    else
+    {
+        multiplier <- switch(exp,
+                             K = 1000, k = 1000,
+                             M = 1000000, m = 1000000,
+                             B = 1000000000, b = 1000000000)
+        value * multiplier
+    }
+}
+prunedData$PropertyDamage <- mapply(applyExponent,
+                                    prunedData$PROPDMG,
+                                    prunedData$PROPDMGEXP)
+prunedData$CropDamage <- mapply(applyExponent,
+                                prunedData$CROPDMG,
+                                prunedData$CROPDMGEXP)
+```
+
+Two variables read in as strings need to be converted to more useful data types. BGN_DATE will be converted to a POSIXct date-time and EVTYPE will be converted to a factor.
+```{r}
+library(lubridate)
+prunedData$Date <- mdy_hms(prunedData$BGN_DATE)
+prunedData$EventType <- factor(prunedData$EVTYPE)
+```
+
+With calculation and type conversions complete, the original columns involved can be discarded. Additionally, the population damage variable can be given friendlier names.
+```{r}
+prunedData <- prunedData[,c("Date", "EventType",
+                            "INJURIES", "FATALITIES",
+                            "PropertyDamage", "CropDamage")]
+colnames(prunedData)[c(3,4)] <- c("Injuries", "Fatalities")
+```
 
 ##Results
 This is where I present the results of my analysis.
