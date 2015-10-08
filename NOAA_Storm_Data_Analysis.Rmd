@@ -70,4 +70,72 @@ colnames(prunedData)[c(3,4)] <- c("Injuries", "Fatalities")
 ```
 
 ##Results
-This is where I present the results of my analysis.
+Since the data set spans such a long period, we may wish to constrain our analysis to more recent years with more complete data records. To make this decision, we can look at the time distribution of the available records. A simple histogram of the year for each record will be sufficient.
+```{r}
+library(ggplot2)
+ggplot(data = prunedData,
+       aes(x = year(Date))) +
+    geom_histogram(binwidth = 1) +
+    labs(title = "Storm Events Recorded By Year",
+         x = "Year",
+         y = "Recorded Events")
+            
+```
+
+Since there is a major uptick in recorded events leading into the new millenium, we will focus our analysis on the last twenty years.
+```{r}
+library(reshape2)
+twentyAgo <- ymd("1995-01-01")
+recentData <- melt(data = prunedData[prunedData$Date >= twentyAgo,],
+                   id.vars = c("Date", "EventType"))
+recentData <- dcast(data = recentData,
+                    formula = EventType ~ variable,
+                    fun.aggregate = sum)
+```
+
+It is difficult to make some sort of comparison between injuries and fatalities to combine them into some single measure of harm to the population's health. By plotting each on its own axis, we can get a feel for the overall harm done by particular storm event types in the past twenty years.
+```{r}
+ggplot(data = recentData,
+       aes(x = Injuries,
+           y = Fatalities,
+           label = EventType)) +
+    geom_point() +
+    geom_text(data = subset(x = recentData,
+                            subset = Fatalities > 350 | Injuries > 2500),
+              color = "red",
+              size = 2.5,
+              vjust = 1.5,
+              hjust = 0.7,
+              angle = 45) +
+    labs(title = "Human Impact of Recent Storm Events by Event Type",
+         x = "Number of Injuries",
+         y = "Number of Fatalities")
+```
+
+Tornado and Excessive Heat events stand as clear outliers in terms of both injuries and fatalities. Flash Flood, Heat, Lightning, Flood, Rip Current, and TSTM Wind events also cause more human damage than other event types.
+
+Economic damages can be combined by dollar value and used to compare event types directly.
+```{r, fig.height=3, fig.width=10}
+ggplot(data = recentData,
+       aes(x = (CropDamage + PropertyDamage) / 1.0e+9,
+           y = 0,
+           ymin = -1,
+           ymax = 1,
+           xmin = 0,
+           label = EventType)) +
+    geom_dotplot(binwidth = 1,
+                 stackdir = "center") +
+    geom_text(data = subset(x = recentData,
+                            subset = CropDamage + PropertyDamage > 1.0e+10),
+              position = position_jitter(),
+              color = "red",
+              size = 2.5,
+              angle = 45,
+              vjust = -1,
+              hjust = 0) +
+    labs(title = "Economic Impact of Recent Storm Events by Event Type",
+         x = "Damage (Billions of Dollars)") +
+    scale_y_continuous(name = "",
+                       breaks = NULL)
+    
+```
