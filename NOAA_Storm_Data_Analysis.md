@@ -1,23 +1,20 @@
----
-title: "NOAA Storm Data Analysis"
-author: "Carey Free"
-output:
-    html_document:
-        keep_md: true
----
+# NOAA Storm Data Analysis
+Carey Free  
 
 ##Synopsis
 The National Oceanic and Atmospheric Administration (NOAA) provides data on the occurrence and consequences of various types of storm event. By analyzing data from recent years, the storm event types resulting in the most human and economic damages can be assessed.
 
 ##Data Processing
 The storm data was acquired in a compressed csv file that can be read directly.
-```{r, cache=TRUE}
+
+```r
 rawData <- read.csv(file = "repdata-data-StormData.csv.bz2",
                     stringsAsFactors = FALSE)
 ```
 
 Many variables tracked in the data set are not relevent for the high level analysis we are performing and can be discarded. Only the occurance data, event type, and damage information needs to be retained.
-```{r}
+
+```r
 prunedData <- rawData[,c("BGN_DATE",
                          "EVTYPE",
                          "FATALITIES", "INJURIES",
@@ -26,14 +23,16 @@ prunedData <- rawData[,c("BGN_DATE",
 ```
 
 The specification for the data set allow for three different magnitudes for damage estimates: K (thousands of dollars), M (millions), and B (billions). Allowing for lower case usage and absent values (indicating nonexponentiated damage estimates), a number a records remain with invalid damage estimate exponents that must be removed.
-```{r}
+
+```r
 validExponents <- c("", "K", "k", "M", "m", "B", "b")
 prunedData <- prunedData[(prunedData$PROPDMGEXP %in% validExponents)
                          & (prunedData$CROPDMGEXP %in% validExponents),]
 ```
 
 Having restricted the exponents to valid values, we can apply them to the damage estimates.
-```{r}
+
+```r
 applyExponent <- function (value, exp) {
     if (is.na(value) | is.na(exp) | exp == "")
     {
@@ -57,14 +56,16 @@ prunedData$CropDamage <- mapply(applyExponent,
 ```
 
 Two variables read in as strings need to be converted to more useful data types. BGN_DATE will be converted to a POSIXct date-time and EVTYPE will be converted to a factor.
-```{r}
+
+```r
 library(lubridate)
 prunedData$Date <- mdy_hms(prunedData$BGN_DATE)
 prunedData$EventType <- factor(prunedData$EVTYPE)
 ```
 
 With calculation and type conversions complete, the original columns involved can be discarded. Additionally, the population damage variable can be given friendlier names.
-```{r}
+
+```r
 prunedData <- prunedData[,c("Date", "EventType",
                             "INJURIES", "FATALITIES",
                             "PropertyDamage", "CropDamage")]
@@ -73,7 +74,8 @@ colnames(prunedData)[c(3,4)] <- c("Injuries", "Fatalities")
 
 ##Results
 Since the data set spans such a long period, we may wish to constrain our analysis to more recent years with more complete data records. To make this decision, we can look at the time distribution of the available records. A simple histogram of the year for each record will be sufficient.
-```{r}
+
+```r
 library(ggplot2)
 ggplot(data = prunedData,
        aes(x = year(Date))) +
@@ -81,11 +83,13 @@ ggplot(data = prunedData,
     labs(title = "Storm Events Recorded By Year",
          x = "Year",
          y = "Recorded Events")
-            
 ```
 
+![](NOAA_Storm_Data_Analysis_files/figure-html/unnamed-chunk-7-1.png) 
+
 Since there is a major uptick in recorded events leading into the new millenium, we will focus our analysis on the last twenty years.
-```{r}
+
+```r
 library(reshape2)
 twentyAgo <- ymd("1995-01-01")
 recentData <- melt(data = prunedData[prunedData$Date >= twentyAgo,],
@@ -96,7 +100,8 @@ recentData <- dcast(data = recentData,
 ```
 
 It is difficult to make some sort of comparison between injuries and fatalities to combine them into some single measure of harm to the population's health. By plotting each on its own axis, we can get a feel for the overall harm done by particular storm event types in the past twenty years.
-```{r}
+
+```r
 ggplot(data = recentData,
        aes(x = Injuries,
            y = Fatalities,
@@ -114,10 +119,13 @@ ggplot(data = recentData,
          y = "Number of Fatalities")
 ```
 
+![](NOAA_Storm_Data_Analysis_files/figure-html/unnamed-chunk-9-1.png) 
+
 Tornado and Excessive Heat events stand as clear outliers in terms of both injuries and fatalities. Flash Flood, Heat, Lightning, Flood, Rip Current, and TSTM Wind events also cause more human damage than other event types.
 
 Economic damages can be combined by dollar value and used to compare event types directly.
-```{r, fig.height=3, fig.width=10}
+
+```r
 ggplot(data = recentData,
        aes(x = (CropDamage + PropertyDamage) / 1.0e+9,
            y = 0,
@@ -140,7 +148,8 @@ ggplot(data = recentData,
          x = "Damage (Billions of Dollars)") +
     scale_y_continuous(name = "",
                        breaks = NULL)
-    
 ```
+
+![](NOAA_Storm_Data_Analysis_files/figure-html/unnamed-chunk-10-1.png) 
 
 Floods are the most damaging events by a large margin. Hurricane/Typhoon events and Storm Surge events also cause very large amounts of damage. Droughts, Flash Floods, Hail, Hurricanes, and Tornadoes cause more damage than most other storm event types.
